@@ -26,7 +26,6 @@ class AppContext:
     """Context for the MCP server."""
 
     cluster: Cluster | None = None
-    #bucket: Any | None = None
     read_only_query_mode: bool = True
 
 
@@ -64,12 +63,7 @@ def get_settings() -> dict:
     help="Couchbase database password",
     callback=validate_required_param,
 )
-#@click.option(
-#    "--bucket-name",
-#    envvar="CB_BUCKET_NAME",
-#    help="Couchbase bucket name",
-#    callback=validate_required_param,
-#)
+
 @click.option(
     "--read-only-query-mode",
     envvar="READ_ONLY_QUERY_MODE",
@@ -90,7 +84,6 @@ def main(
     connection_string,
     username,
     password,
-    #bucket_name,
     read_only_query_mode,
     transport,
 ):
@@ -99,7 +92,6 @@ def main(
         "connection_string": connection_string,
         "username": username,
         "password": password,
-        #"bucket_name": bucket_name,
         "read_only_query_mode": read_only_query_mode,
     }
     mcp.run(transport=transport)
@@ -114,7 +106,6 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     connection_string = settings.get("connection_string")
     username = settings.get("username")
     password = settings.get("password")
-    #bucket_name = settings.get("bucket_name")
     read_only_query_mode = settings.get("read_only_query_mode")
 
     # Validate configuration
@@ -128,9 +119,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     if not password:
         logger.error("Couchbase database password is not set")
         missing_vars.append("password")
-    #if not bucket_name:
-    #    logger.error("Couchbase bucket name is not set")
-    #    missing_vars.append("bucket_name")
+
 
     if missing_vars:
         error_msg = f"Missing required configuration: {', '.join(missing_vars)}"
@@ -148,10 +137,8 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         cluster.wait_until_ready(timedelta(seconds=5))
         logger.info("Successfully connected to Couchbase cluster")
 
-        #bucket = cluster.bucket(bucket_name)
         yield AppContext(
             cluster=cluster, 
-            #bucket=bucket,
             read_only_query_mode=read_only_query_mode
         )
 
@@ -170,7 +157,6 @@ def get_scopes_and_collections_in_bucket(ctx: Context, bucket_name: str) -> dict
     """Get the names of all scopes and collections for a specified bucket.
     Returns a dictionary with scope names as keys and lists of collection names as values.
     """
-    #bucket = ctx.request_context.lifespan_context.bucket
     cluster = ctx.request_context.lifespan_context.cluster
 
     try:
@@ -212,7 +198,6 @@ def get_document_by_id(
     ctx: Context, bucket_name: str, scope_name: str, collection_name: str, document_id: str
 ) -> dict[str, Any]:
     """Get a document by its ID from the specified bucket, scope and collection."""
-    #bucket = ctx.request_context.lifespan_context.bucket
     cluster = ctx.request_context.lifespan_context.cluster
     try:
         bucket = cluster.bucket(bucket_name)
@@ -239,7 +224,6 @@ def upsert_document_by_id(
 ) -> bool:
     """Insert or update a document in a bucket, scope and collection by its ID.
     Returns True on success, False on failure."""
-    #bucket = ctx.request_context.lifespan_context.bucket
     cluster = ctx.request_context.lifespan_context.cluster
     try:
         bucket = cluster.bucket(bucket_name)
@@ -262,7 +246,6 @@ def delete_document_by_id(
 ) -> bool:
     """Delete a document in a bucket, scope and collection by its ID.
     Returns True on success, False on failure."""
-    #bucket = ctx.request_context.lifespan_context.bucket
     cluster = ctx.request_context.lifespan_context.cluster
     try:
         bucket = cluster.bucket(bucket_name)
@@ -309,7 +292,6 @@ def run_sql_plus_plus_query(
     ctx: Context, bucket_name: str, scope_name: str, query: str
 ) -> list[dict[str, Any]]:
     """Run a SQL++ query on a scope in a specified bucket and return the results as a list of JSON objects."""
-    #bucket = ctx.request_context.lifespan_context.bucket
     cluster = ctx.request_context.lifespan_context.cluster
     try:
         bucket = cluster.bucket(bucket_name)
