@@ -275,13 +275,14 @@ def advise_index_for_sql_plus_plus_query(
     try:
         query = f"ADVISE {query}"
         result = run_sql_plus_plus_query(ctx, bucket_name, scope_name, query)
-        advice = result[0].get("advice")
-        if (advice is not None):
-            advise_info = advice.get("adviseinfo")
-            if ( advise_info is not None):
-                response["current_indexes"] = advise_info.get("current_indexes", "No current indexes")
-                response["recommended_indexes"] = advise_info.get("recommended_indexes","No index recommendations available")
-                response["query"]=result[0].get("query","Query statement unavailable")
+
+        if result and (advice := result[0].get("advice")):
+            if (advice is not None):
+                advise_info = advice.get("adviseinfo")
+                if ( advise_info is not None):
+                    response["current_indexes"] = advise_info.get("current_indexes", "No current indexes")
+                    response["recommended_indexes"] = advise_info.get("recommended_indexes","No index recommendations available")
+                    response["query"]=result[0].get("query","Query statement unavailable")
         return response
     except Exception as e:
         logger.error(f"Error running Advise on query: {e}")
