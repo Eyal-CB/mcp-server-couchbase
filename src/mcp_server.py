@@ -151,7 +151,29 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 mcp = FastMCP(MCP_SERVER_NAME, lifespan=app_lifespan)
 
 
+
 # Tools
+
+@mcp.tool()
+def get_list_of_buckets_with_settings(
+    ctx: Context
+) -> list[str]:
+    """Get the list of buckets from the Couchbase cluster, including their bucket settings.
+    Returns a list of bucket setting objects.
+    """
+    cluster = ctx.request_context.lifespan_context.cluster
+    result=[]
+    try:
+        bucket_manager = cluster.buckets()
+        buckets = bucket_manager.get_all_buckets()
+        for b in buckets:
+            result.append(b)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting bucket names: {e}")
+        raise e
+
+
 @mcp.tool()
 def get_scopes_and_collections_in_bucket(ctx: Context, bucket_name: str) -> dict[str, list[str]]:
     """Get the names of all scopes and collections for a specified bucket.
