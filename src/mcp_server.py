@@ -361,41 +361,86 @@ def run_sql_plus_plus_query(
 #Slow Query tools
 
 @mcp.tool()
-def aggregate_slow_queries_stats_by_pattern(ctx: Context, query_limit:int ) -> list[dict[str, Any]]:
-    """Run a query on the completed_requests system catalog to discover potential slow running queries. 
+def advanced_aggregate_slow_queries_stats_by_pattern(ctx: Context, query_limit:int = 10) -> list[dict[str, Any]]:
+    """Run an in depth analysis query on the completed_requests system catalog to discover potential slow running queries along with index scan and fetch counts and times. 
     This query attempts to reduce the statements of logged queries into patterns by removing any values and only looking at the query structure with regard to returned fields,
-    filtered predicates, sorts and aggregations. For each query pattern it returns the count, min, max and average duration.
-    Accepts an integer as a limit to the number of results returned.
-    Returns an array of query patterns with the count, min, max and average duration ordered from most to least found patterns.
+    filtered predicates, sorts and aggregations. 
+    For each query pattern it returns execution durations, counts and example queries.
+    
+    Accepts an optional integer as a limit to the number of results returned (default 10).
+    Returns an object array of query patterns with:
+    1. total count and count per user running the query.
+    2. min, max and average duration of the full execution.
+    3. min, max and average duration of each of the sub-operations index scan (or primary scan) and Fetch.
+    4. Count of number of documents found in index scans and the total fetched.
+    5. An example instance of one of the queries run matching this pattern.
     """
 
     query_template = """
+    SELECT grouped.query_pattern,
+       grouped.statement_example,
+       (OBJECT u: ARRAY_LENGTH(ARRAY v FOR v IN grouped.users_agg WHEN v = u END) FOR u IN ARRAY_DISTINCT(grouped.users_agg) END) AS user_query_counts,
+       grouped.total_count,
+       ROUND(grouped.min_duration_in_seconds, 3) AS min_duration_in_seconds,
+       ROUND(grouped.max_duration_in_seconds, 3) AS max_duration_in_seconds,
+       ROUND(grouped.avg_duration_in_seconds, 3) AS avg_duration_in_seconds,
+       ROUND((grouped.sorted_durations[FLOOR(grouped.total_count / 2)] + 
+              grouped.sorted_durations[CEIL(grouped.total_count / 2) - 1]) / 2, 3) AS median_duration_in_seconds,
+       ROUND(grouped.avg_fetch_count, 3) AS avg_fetch_docs_count,
+       ROUND(grouped.avg_primaryScan_count, 3) AS avg_primaryScan_docs_count,
+       ROUND(grouped.avg_indexScan_count, 3) AS avg_indexScan_docs_count,
+       ROUND(grouped.avg_fetch_time, 3) AS avg_fetch_duration_in_seconds,
+       ROUND(grouped.avg_primaryScan_time, 3) AS avg_primaryScan_duration_in_seconds,
+       ROUND(grouped.avg_indexScan_time, 3) AS avg_indexScan_duration_in_seconds
+FROM (
     SELECT query_pattern,
-        COUNT(*) AS count,
-        MIN(STR_TO_DURATION(serviceTime))/1000000000 AS min_duration_in_seconds,
-        MAX(STR_TO_DURATION(serviceTime))/1000000000 AS max_duration_in_seconds,
-        AVG(STR_TO_DURATION(serviceTime))/1000000000 AS avg_duration_in_seconds
-    FROM system:completed_requests
-    LET query_pattern = IFMISSING(preparedText, REGEX_REPLACE(
-    REGEX_REPLACE(
-    REGEX_REPLACE(
-    REGEX_REPLACE(
-    REGEX_REPLACE(
-    REGEX_REPLACE(statement,
-        "\\\\s+", " "),
-        '"(?:[^"]|"")*"', "?"),
-        "'(?:[^']|'')*'", "?"),
-        "\\\\b-?\\\\d+\\\\.?\\\\d*\\\\b", "?"),
-        "(?i)\\\\b(NULL|TRUE|FALSE)\\\\b", "?"),
-        "(\\\\?\\\\s*,\\\\s*)+\\\\?", "?"))
-    WHERE UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'INFER %'
-        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'ADVISE %'
-        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'CREATE %'
-        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'CREATE INDEX%'
-        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'ALTER INDEX%'
-        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE '% SYSTEM:%'
+           ARRAY_AGG(sub.users) AS users_agg,
+           ARRAY_AGG(sub.statement)[0] as statement_example, 
+           COUNT(*) AS total_count,
+           MIN(duration_in_seconds) AS min_duration_in_seconds,
+           MAX(duration_in_seconds) AS max_duration_in_seconds,
+           AVG(duration_in_seconds) AS avg_duration_in_seconds,
+           ARRAY_SORT(ARRAY_AGG(duration_in_seconds)) AS sorted_durations,
+           AVG(sub.`fetch_count`) AS avg_fetch_count,
+           AVG(sub.`primaryScan_count`) AS avg_primaryScan_count,
+           AVG(sub.`indexScan_count`) AS avg_indexScan_count,
+           AVG(sub.`fetch_time`) AS avg_fetch_duration_in_seconds,
+           AVG(sub.`primaryScan_time`) AS avg_primaryScan_duration_in_seconds,
+           AVG(sub.`indexScan_time`) AS avg_indexScan_duration_in_seconds           
+    FROM (
+        SELECT query_pattern,
+               statement,
+               users,
+               STR_TO_DURATION(serviceTime) / 1000000000 AS duration_in_seconds,
+               phaseCounts.`fetch` AS `fetch_count`,
+               phaseCounts.`primaryScan` AS `primaryScan_count`,
+               phaseCounts.`indexScan` AS `indexScan_count`,
+               STR_TO_DURATION(phaseTimes.`fetch`)/ 1000000000 AS `fetch_duration_in_seconds`,
+               STR_TO_DURATION(phaseTimes.`primaryScan`)/ 1000000000 AS `primaryScan_duration_in_seconds`,
+               STR_TO_DURATION(phaseTimes.`indexScan`)/ 1000000000 AS `indexScan_duration_in_seconds`
+        FROM system:completed_requests
+        LET query_pattern = IFMISSING(preparedText, REGEX_REPLACE(
+  REGEX_REPLACE(
+  REGEX_REPLACE(
+  REGEX_REPLACE(
+  REGEX_REPLACE(
+  REGEX_REPLACE(statement,
+    "\\\\s+", " "),
+    '"(?:[^"]|"")*"', "?"),
+    "'(?:[^']|'')*'", "?"),
+    "\\\\b-?\\\\d+\\\\.?\\\\d*\\\\b", "?"),
+    "(?i)\\\\b(NULL|TRUE|FALSE)\\\\b", "?"),
+    "(\\\\?\\\\s*,\\\\s*)+\\\\?", "?"))
+        WHERE  UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'INFER %'
+              AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'ADVISE %'
+              AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'CREATE %'
+              AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'CREATE INDEX%'
+              AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'ALTER INDEX%'
+              AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE '% SYSTEM:%'
+    ) AS sub
     GROUP BY query_pattern
-    ORDER BY count DESC
+) AS grouped
+ORDER BY grouped.total_count DESC
     LIMIT {limit}
     """
 
@@ -406,7 +451,76 @@ def aggregate_slow_queries_stats_by_pattern(ctx: Context, query_limit:int ) -> l
     except Exception as e:
         logger.error(f"Error completed_request query: {str(e)}", exc_info=True)
         raise e
+    
+@mcp.tool()
+def retreive_single_slow_query_plan(ctx: Context, query_statement : str, query_limit:int = 10) -> list[dict[str, Any]]:
+    """Retrieve the query execution report and execution plan of all executions of the given query saved in the completed_requests catalog.
+    The query statement must be an exact match to the statement executed, including values or placeholders where applicable.
+    Accepts a query statement and an optional integer as a limit to the number of results returned (default 10).
+    Returns an object array of execution plans for all instances of the query, ordered by execution time from highest to lowest.
+    """
 
+    query_template = """
+    SELECT r.*, meta(r).plan
+    FROM system:completed_requests AS r
+    WHERE UPPER(IFMISSING(preparedText, statement)) = UPPER('{query_statement}')
+    ORDER BY STR_TO_DURATION(r.elapsedTime) DESC
+    LIMIT {limit}
+    """
+
+    query = query_template.format(limit=query_limit,query_statement=query_statement)
+    try:
+        result = system_catalog_query(ctx,query)
+        return result
+    except Exception as e:
+        logger.error(f"Error completed_request query: {str(e)}", exc_info=True)
+        raise e
+    
+@mcp.tool()
+def retreive_list_of_similar_queries_from_completed_requests_catalog(ctx: Context, query_statement : str, query_limit:int = 10) -> list[dict[str, Any]]:
+    """Retrieve a list of all recorded query statements matching the pattern of the specified query (i.e. similar queries differing in predicate values and capitalizations).
+    The query statement must be an exact match to the statement executed, including values or placeholders where applicable.
+    Accepts a query statement and an optional integer as a limit to the number of results returned (default 10).
+    Returns a list of query statements matching the pattern.
+    """
+
+    query_template = """
+    SELECT raw r.statement
+    FROM system:completed_requests AS r
+    LET query_pattern = UPPER(IFMISSING(preparedText, REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(statement,
+        "\\\\s+", " "),
+        '"(?:[^"]|"")*"', "?"),
+        "'(?:[^']|'')*'", "?"),
+        "\\\\b-?\\\\d+\\\\.?\\\\d*\\\\b", "?"),
+        "(?i)\\\\b(NULL|TRUE|FALSE)\\\\b", "?"),
+        "(\\\\?\\\\s*,\\\\s*)+\\\\?", "?")))
+    WHERE query_pattern = REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE({query_statement},
+        "\\\\s+", " "),
+        '"(?:[^"]|"")*"', "?"),
+        "'(?:[^']|'')*'", "?"),
+        "\\\\b-?\\\\d+\\\\.?\\\\d*\\\\b", "?"),
+        "(?i)\\\\b(NULL|TRUE|FALSE)\\\\b", "?"),
+        "(\\\\?\\\\s*,\\\\s*)+\\\\?", "?")
+    LIMIT {limit}
+    """
+
+    query = query_template.format(limit=query_limit,query_statement=query_statement)
+    try:
+        result = system_catalog_query(ctx,query)
+        return result
+    except Exception as e:
+        logger.error(f"Error completed_request query: {str(e)}", exc_info=True)
+        raise e
 
 
 # Util Functions

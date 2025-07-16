@@ -12,6 +12,7 @@ An [MCP](https://modelcontextprotocol.io/) server implementation of Couchbase th
 - Run a [SQL++ query](https://www.couchbase.com/sqlplusplus/) on a specified bucket and scope
   - There is an option in the MCP server, `READ_ONLY_QUERY_MODE` that is set to true by default to disable running SQL++ queries that change the data or the underlying collection structure. Note that the documents can still be updated by ID.
 - Retreive Index Advisor advice for a query on a specified bucket and scope.
+- Get summary and specific information on slow running queries from the completed_requests catalog.
 
 ## Prerequisites
 
