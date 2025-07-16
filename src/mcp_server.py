@@ -389,6 +389,72 @@ def run_sql_plus_plus_query(
         logger.error(f"Error running query: {str(e)}", exc_info=True)
         raise
 
+#Slow Query tools
+
+@mcp.tool()
+def aggregate_slow_queries_stats_by_pattern(ctx: Context, query_limit:int ) -> list[dict[str, Any]]:
+    """Run a query on the completed_requests system catalog to discover potential slow running queries. 
+    This query attempts to reduce the statements of logged queries into patterns by removing any values and only looking at the query structure with regard to returned fields,
+    filtered predicates, sorts and aggregations. For each query pattern it returns the count, min, max and average duration.
+    Accepts an integer as a limit to the number of results returned.
+    Returns an array of query patterns with the count, min, max and average duration ordered from most to least found patterns.
+    """
+
+    query_template = """
+    SELECT query_pattern,
+        COUNT(*) AS count,
+        MIN(STR_TO_DURATION(serviceTime))/1000000000 AS min_duration_in_seconds,
+        MAX(STR_TO_DURATION(serviceTime))/1000000000 AS max_duration_in_seconds,
+        AVG(STR_TO_DURATION(serviceTime))/1000000000 AS avg_duration_in_seconds
+    FROM system:completed_requests
+    LET query_pattern = IFMISSING(preparedText, REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(
+    REGEX_REPLACE(statement,
+        "\\\\s+", " "),
+        '"(?:[^"]|"")*"', "?"),
+        "'(?:[^']|'')*'", "?"),
+        "\\\\b-?\\\\d+\\\\.?\\\\d*\\\\b", "?"),
+        "(?i)\\\\b(NULL|TRUE|FALSE)\\\\b", "?"),
+        "(\\\\?\\\\s*,\\\\s*)+\\\\?", "?"))
+    WHERE UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'INFER %'
+        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'ADVISE %'
+        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'CREATE %'
+        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'CREATE INDEX%'
+        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE 'ALTER INDEX%'
+        AND UPPER(IFMISSING(preparedText, statement)) NOT LIKE '% SYSTEM:%'
+    GROUP BY query_pattern
+    ORDER BY count DESC
+    LIMIT {limit}
+    """
+
+    query = query_template.format(limit=query_limit)
+    try:
+        result = system_catalog_query(ctx,query)
+        return result
+    except Exception as e:
+        logger.error(f"Error completed_request query: {str(e)}", exc_info=True)
+        raise e
+
+
+
+# Util Functions
+def system_catalog_query(ctx: Context, query: str) -> list[dict[str, Any]]:
+    cluster = ctx.request_context.lifespan_context.cluster
+    try:
+
+        results = []
+        result = cluster.query(query)
+        for row in result:
+            results.append(row)
+        return results
+    except Exception as e:
+        logger.error(f"Error running query: {str(e)}", exc_info=True)
+        raise e
+
+
 
 if __name__ == "__main__":
     main()
