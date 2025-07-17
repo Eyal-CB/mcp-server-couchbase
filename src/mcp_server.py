@@ -10,7 +10,8 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 from lark_sqlpp import modifies_data, modifies_structure, parse_sqlpp
 import click
-
+import requests
+from requests.auth import HTTPBasicAuth
 MCP_SERVER_NAME = "couchbase"
 
 # Configure logging
@@ -184,6 +185,37 @@ def get_cluster_health_check(
         raise e
 
     return services
+
+def fetch_metrics(ip, username, password) -> str:
+    url = f"https://{ip}:18091/metrics"
+
+    try:
+        response = requests.get(
+            url,
+            auth=HTTPBasicAuth(username, password),
+            verify=False,  # <--- Ignores SSL cert verification
+            timeout=10
+        )
+        response.raise_for_status()
+        return response.text
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching metrics: {e}"
+
+
+@mcp.tool()
+def get_cluster_metrics(
+    ctx: Context, ip: str) -> str:
+    """Runs an API call to the metrics endpoint of a given couchbase node by IP or hostname. Metrics contain info on nodes performance,
+    resources and services.
+    Returns: String representing the prometheus formatted metrics return by couchbase."""
+    
+    settings = get_settings()
+
+    username = settings.get("username")
+    password = settings.get("password")
+
+    metrics = fetch_metrics(ip, username, password)
+    return metrics
 
 @mcp.tool()
 def get_list_of_buckets_with_settings(
