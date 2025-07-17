@@ -11,7 +11,9 @@ An [MCP](https://modelcontextprotocol.io/) server implementation of Couchbase th
 - Delete a document by ID from a specified bucket, scope and collection
 - Run a [SQL++ query](https://www.couchbase.com/sqlplusplus/) on a specified bucket and scope
   - There is an option in the MCP server, `READ_ONLY_QUERY_MODE` that is set to true by default to disable running SQL++ queries that change the data or the underlying collection structure. Note that the documents can still be updated by ID.
-- Retreive Index Advisor advice for a query on a specified bucket and scope.
+- Retrieve Index Advisor advice for a query on a specified bucket and scope.
+- Retrieve cluster node IPs and health status.
+- Retrieve /metrics endpoint data by IP.
 
 ## Prerequisites
 
@@ -41,6 +43,8 @@ This is the common configuration for the MCP clients such as Claude Desktop, Cur
         "--directory",
         "path/to/cloned/repo/mcp-server-couchbase/",
         "run",
+        "--with",
+        "requests",
         "src/mcp_server.py"
       ],
       "env": {
