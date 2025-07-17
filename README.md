@@ -64,6 +64,16 @@ The server can be configured using environment variables. The following variable
 
 > Note: If you have other MCP servers in use in the client, you can add it to the existing `mcpServers` object.
 
+### MCP Server tool Configuration
+Tools are defined in separate python modules and can be selectively included in the MCP server instantiation. By default only "tools.py" is imported. Any additional tools can be defined in the mcp_config.json file as follows:
+
+```json
+{
+    "tools":["tool_module_1","tool_module_2"]
+}
+```
+
+
 ### Claude Desktop
 
 Follow the steps below to use Couchbase MCP server with Claude Desktop MCP client

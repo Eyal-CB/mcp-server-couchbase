@@ -422,6 +422,7 @@ def system_catalog_query(ctx: Context, query: str) -> list[dict[str, Any]]:
 
 
 if __name__ == "__main__":
+    importlib.import_module("tools") #load default tools
     config = load_config()
     tools = config.get("tools", [])
     load_tool_modules(tools)
