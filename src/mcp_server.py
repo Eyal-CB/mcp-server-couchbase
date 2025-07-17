@@ -13,7 +13,10 @@ from couchbase_mcp import logger, set_mcp, MCP_SERVER_NAME
 import json
 import importlib
 import os
+import requests
+from requests.auth import HTTPBasicAuth
 
+MCP_SERVER_NAME = "couchbase"
 
 # Configure logging
 
