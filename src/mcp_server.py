@@ -153,6 +153,37 @@ mcp = FastMCP(MCP_SERVER_NAME, lifespan=app_lifespan)
 
 
 # Tools
+@mcp.tool()
+def get_cluster_health_check(
+    ctx: Context) -> list[dict[str,Any]]:
+    """Runs a healthcheck (ping report) on the Couchbase cluster. Returns an array of json objects with pintreport results and node IPs.
+    Also useful for discovering available services in the cluster. Multiple services may reside on each node.
+    Returns: Array of service objects, each having the URL (consisting of IP and port for the service) and state of the service"""
+    cluster = ctx.request_context.lifespan_context.cluster
+
+    services = []
+    try:
+        ping_report = cluster.ping()
+    except Exception as e:
+        logger.error(f"Unable to reach cluster for health check: {e}")
+        raise e
+    try:
+        services = []
+        for service_type, endpoints in ping_report.endpoints.items():
+            for ep in endpoints:
+                services.append({
+                    "service": service_type.value,
+                    "state": ep.state.value,
+                    "id": ep.id,
+                    "ip": ep.remote,
+                    "latency_ms": ep.latency.total_seconds() * 1000 if ep.latency else None,
+                    "error": str(ep.error) if ep.error else None
+                })
+    except Exception as e:
+        logger.error(f"Unable to parse ping report: {e}")
+        raise e
+
+    return services
 
 @mcp.tool()
 def get_list_of_buckets_with_settings(
