@@ -237,7 +237,7 @@ def call_api(ctx: Context, url: str ) -> requests.Response:
 
     username = ctx.request_context.lifespan_context.username
     password = ctx.request_context.lifespan_context.password
-    ca_cert_path = ctx.request_context.lifespan_context.ca_cert_path or False
+    ca_cert_path = ctx.request_context.lifespan_context.ca_cert_path or True
 
     try:
         response = requests.get(
