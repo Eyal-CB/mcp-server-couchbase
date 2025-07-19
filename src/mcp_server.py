@@ -259,7 +259,7 @@ def call_api(ctx: Context, url: str ) -> requests.Response:
         raise e
 
 def build_api_url(ctx: Context, hostname: str, service: str, endpoint: str) -> str:
-    """Return full url for an api call to given service and endpoint"""
+    """Return full url for an api call to given hostname, service and endpoint"""
     protocol = "http"
     port = SERVICE_PORT_MAPPING["no_tls"].get(service) or "8091"
     if( ctx.request_context.lifespan_context.use_tls):
@@ -288,9 +288,9 @@ def get_cluster_prometheus_metrics_endpoints(
     except Exception as e:
         logger.error(f"Error calling API to fetch endpoints: {e}")
         raise e
-    
-    if (response.json()):
-        return response.json()[0].get("targets")
+    json_data = response.json()
+    if (json_data and isinstance(json_data,list)):
+        return json_data[0].get("targets")
     else:
         logger.error(f"Unexpected response from fetch endpoints API {response.text}")
         raise TypeError(f"Unexpected response from fetch endpoints API {response.text}")
@@ -299,10 +299,10 @@ def get_cluster_prometheus_metrics_endpoints(
 @mcp.tool()
 def get_cluster_node_metrics(
     ctx: Context, hostname: str) -> str:
-    """Runs an API call to the metrics endpoint of a given couchbase node hostname and port. 
+    """Runs an API call to the metrics endpoint of a given couchbase node hostname. 
     Metrics contain info on nodes performance, resources and services.
-    Accepts the node hostname + port as a string. If not port is given, a default of 18091 (enrypted tls) is used.
-    Returns: String representing the prometheus formatted metrics return by couchbase."""
+    Accepts the node hostname as a string. 
+    Returns: String representing the prometheus formatted metrics returned by couchbase."""
 
     hostname = strip_protocol(hostname)
     parts = hostname.split(":",1)
