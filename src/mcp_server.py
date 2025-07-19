@@ -468,6 +468,8 @@ def retreive_single_slow_query_plan(ctx: Context, query_statement : str, query_l
     LIMIT {limit}
     """
 
+    if (not isinstance(query_limit, int)):
+        raise TypeError(f"Param query_limit must be an integer value, received {type(query_limit)} - {query_limit}")
     query = query_template.format(limit=query_limit,query_statement=query_statement)
     try:
         result = system_catalog_query(ctx,query)
@@ -514,6 +516,8 @@ def retreive_list_of_similar_queries_from_completed_requests_catalog(ctx: Contex
     LIMIT {limit}
     """
 
+    if (not isinstance(query_limit, int)):
+        raise TypeError(f"Param query_limit must be an integer value, received {type(query_limit)} - {query_limit}")
     query = query_template.format(limit=query_limit,query_statement=query_statement)
     try:
         result = system_catalog_query(ctx,query)
