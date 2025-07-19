@@ -10,18 +10,16 @@ mcp=get_mcp()
 @mcp.tool()
 def get_list_of_buckets_with_settings(
     ctx: Context
-) -> list[str]:
+) -> list[Any]:
     """Get the list of buckets from the Couchbase cluster, including their bucket settings.
     Returns a list of bucket setting objects.
     """
     cluster = ctx.request_context.lifespan_context.cluster
-    result=[]
+
     try:
         bucket_manager = cluster.buckets()
         buckets = bucket_manager.get_all_buckets()
-        for b in buckets:
-            result.append(b)
-        return result
+        return buckets
     except Exception as e:
         logger.error(f"Error getting bucket names: {e}")
         raise e
