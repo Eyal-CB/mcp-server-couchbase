@@ -444,6 +444,8 @@ ORDER BY grouped.total_count DESC
     LIMIT {limit}
     """
 
+    if (not isinstance(query_limit, int)):
+        raise TypeError(f"Param query_limit must be an integer value, received {type(query_limit)} - {query_limit}")
     query = query_template.format(limit=query_limit)
     try:
         result = system_catalog_query(ctx,query)
