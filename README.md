@@ -12,8 +12,8 @@ An [MCP](https://modelcontextprotocol.io/) server implementation of Couchbase th
 - Run a [SQL++ query](https://www.couchbase.com/sqlplusplus/) on a specified bucket and scope
   - There is an option in the MCP server, `READ_ONLY_QUERY_MODE` that is set to true by default to disable running SQL++ queries that change the data or the underlying collection structure. Note that the documents can still be updated by ID.
 - Retrieve Index Advisor advice for a query on a specified bucket and scope.
-- Retrieve cluster node IPs and health status.
-- Retrieve /metrics endpoint data by IP.
+- Retrieve cluster node services and health status.
+- Retrieve /metrics endpoint data by hostname.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ This is the common configuration for the MCP clients such as Claude Desktop, Cur
 The server can be configured using environment variables. The following variables are supported:
 
 - `CB_CONNECTION_STRING`: The connection string to the Couchbase cluster
-- `CA_CERT_PATH`: The path to the Server CA certificate, used for server API calls
+- `CA_CERT_PATH`: The path to the Server CA certificate, required for server API calls in tls mode
 - `CB_USERNAME`: The username with access to the bucket to use to connect
 - `CB_PASSWORD`: The password for the username to connect
 - `READ_ONLY_QUERY_MODE`: Setting to configure whether SQL++ queries that allow data to be modified are allowed. It is set to True by default.
