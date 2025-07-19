@@ -12,7 +12,29 @@ from lark_sqlpp import modifies_data, modifies_structure, parse_sqlpp
 import click
 import requests
 from requests.auth import HTTPBasicAuth
+
 MCP_SERVER_NAME = "couchbase"
+
+SERVICE_PORT_MAPPING = {
+    "tls" : {
+        "admin" : "18091",
+        "index" : "19012",
+        "query" : "18093",
+        "fts" : "18094",
+        "cbas" : "18095",
+        "eventing" : "18097"
+
+    },
+    "no_tls" : {
+        "admin" : "8091",
+        "index" : "9012",
+        "query" : "8093",
+        "fts" : "8094",
+        "cbas" : "8095",
+        "eventing" : "8097"
+
+    }
+}
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +50,11 @@ class AppContext:
 
     cluster: Cluster | None = None
     read_only_query_mode: bool = True
+    username: str = None
+    password: str = None
+    connection_string: str = None
+    ca_cert_path : str = None
+    use_tls : bool = True
 
 
 def validate_required_param(
@@ -66,6 +93,13 @@ def get_settings() -> dict:
 )
 
 @click.option(
+    '--ca-cert-path',
+    envvar="CA_CERT_PATH",
+    type=click.Path(exists=True),
+    default=None,
+    help='Path to Server TLS certificate, required for API calls.')
+
+@click.option(
     "--read-only-query-mode",
     envvar="READ_ONLY_QUERY_MODE",
     type=bool,
@@ -86,6 +120,7 @@ def main(
     username,
     password,
     read_only_query_mode,
+    ca_cert_path,
     transport,
 ):
     """Couchbase MCP Server"""
@@ -94,6 +129,7 @@ def main(
         "username": username,
         "password": password,
         "read_only_query_mode": read_only_query_mode,
+        "ca_cert_path" : ca_cert_path
     }
     mcp.run(transport=transport)
 
@@ -108,6 +144,11 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     username = settings.get("username")
     password = settings.get("password")
     read_only_query_mode = settings.get("read_only_query_mode")
+    ca_cert_path = settings.get("ca_cert_path")
+    use_tls = True
+    if "://" in connection_string:
+        protocol = connection_string.split("://", 1)[0]
+        use_tls = (protocol[-1] == 's')
 
     # Validate configuration
     missing_vars = []
@@ -140,7 +181,12 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
         yield AppContext(
             cluster=cluster, 
-            read_only_query_mode=read_only_query_mode
+            ca_cert_path = ca_cert_path,
+            connection_string = connection_string,
+            username=username,
+            password=password,
+            read_only_query_mode=read_only_query_mode,
+            use_tls=use_tls
         )
 
     except Exception as e:
@@ -186,52 +232,102 @@ def get_cluster_health_check(
 
     return services
 
-def fetch_metrics(ip, username, password) -> str:
-    url = f"https://{ip}:18091/metrics"
+def call_api(ctx: Context, url: str ) -> requests.Response:
+    """Call Couchbase API for given URL. Returns raw Response object."""
+
+    username = ctx.request_context.lifespan_context.username
+    password = ctx.request_context.lifespan_context.password
+    ca_cert_path = ctx.request_context.lifespan_context.ca_cert_path or False
 
     try:
         response = requests.get(
             url,
             auth=HTTPBasicAuth(username, password),
-            verify=False,  # <--- Ignores SSL cert verification
+            verify=ca_cert_path,  
             timeout=10
         )
         response.raise_for_status()
-        return response.text
+        return response
+    except requests.exceptions.SSLError as e:
+        logger.error(f"SSL verification failed: {e}")
+        raise e
     except requests.exceptions.RequestException as e:
-        return f"Error fetching metrics: {e}"
+        logger.error(f"Error fetching api: {e}")
+        raise e
+    except Exception as e:
+        logger.error(f"Error fetching api: {e}")
+        raise e
+
+def build_api_url(ctx: Context, hostname: str, service: str, endpoint: str) -> str:
+    """Return full url for an api call to given service and endpoint"""
+    protocol = "http"
+    port = SERVICE_PORT_MAPPING["no_tls"].get(service) or "8091"
+    if( ctx.request_context.lifespan_context.use_tls):
+        protocol = "https"
+        port = SERVICE_PORT_MAPPING["tls"].get(service) or "18091"
+    return f'{protocol}://{hostname}:{port}/{endpoint}'
+
+
+def strip_protocol(url: str) -> str:
+    parts = url.split("://", 1)
+    return parts[1] if len(parts) == 2 else url
+
+ 
+@mcp.tool()
+def get_cluster_prometheus_metrics_endpoints(
+    ctx: Context) -> list[str]:
+    """Runs an API call to the Ccouchbase Prometheus Endpoint Service Discovery. Retrieves the hostnames and ports of all metrics endpoints for the cluster nodes.
+    Required for calling the get_cluster_metrics function in a cluster.
+    Accepts the hostname of the node to get metrics from.
+    Returns: Array of hostname+port as strings"""
+
+    hostname = strip_protocol(ctx.request_context.lifespan_context.connection_string)
+    url =  build_api_url(ctx, hostname, "admin", "prometheus_sd_config" )
+    try:
+        response = call_api(ctx, url)
+    except Exception as e:
+        logger.error(f"Error calling API to fetch endpoints: {e}")
+        raise e
+    
+    if (response.json()):
+        return response.json()[0].get("targets")
+    else:
+        logger.error(f"Unexpected response from fetch endpoints API {response.text}")
+        raise TypeError(f"Unexpected response from fetch endpoints API {response.text}")
 
 
 @mcp.tool()
-def get_cluster_metrics(
-    ctx: Context, ip: str) -> str:
-    """Runs an API call to the metrics endpoint of a given couchbase node by IP or hostname. Metrics contain info on nodes performance,
-    resources and services.
+def get_cluster_node_metrics(
+    ctx: Context, hostname: str) -> str:
+    """Runs an API call to the metrics endpoint of a given couchbase node hostname and port. 
+    Metrics contain info on nodes performance, resources and services.
+    Accepts the node hostname + port as a string. If not port is given, a default of 18091 (enrypted tls) is used.
     Returns: String representing the prometheus formatted metrics return by couchbase."""
-    
-    settings = get_settings()
 
-    username = settings.get("username")
-    password = settings.get("password")
-
-    metrics = fetch_metrics(ip, username, password)
-    return metrics
+    hostname = strip_protocol(hostname)
+    parts = hostname.split(":",1)
+    hostname = parts[0]
+    url = build_api_url(ctx, hostname, "admin", "metrics" )
+    try:
+        response = call_api(ctx, url)
+        return response.text
+    except Exception as e:
+        logger.error(f"Error calling API to fetch endpoints: {e}")
+        raise e
 
 @mcp.tool()
 def get_list_of_buckets_with_settings(
     ctx: Context
-) -> list[str]:
+) -> list[Any]:
     """Get the list of buckets from the Couchbase cluster, including their bucket settings.
     Returns a list of bucket setting objects.
     """
     cluster = ctx.request_context.lifespan_context.cluster
-    result=[]
+
     try:
         bucket_manager = cluster.buckets()
         buckets = bucket_manager.get_all_buckets()
-        for b in buckets:
-            result.append(b)
-        return result
+        return buckets
     except Exception as e:
         logger.error(f"Error getting bucket names: {e}")
         raise e

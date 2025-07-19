@@ -60,6 +60,7 @@ This is the common configuration for the MCP clients such as Claude Desktop, Cur
 The server can be configured using environment variables. The following variables are supported:
 
 - `CB_CONNECTION_STRING`: The connection string to the Couchbase cluster
+- `CA_CERT_PATH`: The path to the Server CA certificate, used for server API calls
 - `CB_USERNAME`: The username with access to the bucket to use to connect
 - `CB_PASSWORD`: The password for the username to connect
 - `READ_ONLY_QUERY_MODE`: Setting to configure whether SQL++ queries that allow data to be modified are allowed. It is set to True by default.
