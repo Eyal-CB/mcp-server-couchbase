@@ -186,35 +186,19 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         protocol = connection_string.split("://", 1)[0]
         use_tls = (protocol[-1] == 's')
 
-    # Validate configuration
-    missing_vars = []
-    if not connection_string:
-        logger.error("Couchbase connection string is not set")
-        missing_vars.append("connection_string")
-    if not username:
-        logger.error("Couchbase database user is not set")
-        missing_vars.append("username")
-    if not password:
-        logger.error("Couchbase database password is not set")
-        missing_vars.append("password")
-
-
-    if missing_vars:
-        error_msg = f"Missing required configuration: {', '.join(missing_vars)}"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
 
     try:
         logger.info("Creating Couchbase cluster connection...")
         #use client cert if provided, else user/password
         if client_cert_path:
+            client_cert_path = client_cert_path[:-1] if client_cert_path.endswith('/') else client_cert_path
             tls_conf = {
                 "cert_path" : f'{client_cert_path}/client.pem',
                 "key_path" : f'{client_cert_path}/client.key',
             }
             #set ca cert as trust store if provided
             if ca_cert_path:
-                tls_conf["trust_store"] = ca_cert_path
+                tls_conf["trust_store_path"] = ca_cert_path
             auth = CertificateAuthenticator(**tls_conf)
         else:
             auth = PasswordAuthenticator(username, password)

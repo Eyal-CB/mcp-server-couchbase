@@ -13,6 +13,7 @@ An [MCP](https://modelcontextprotocol.io/) server implementation of Couchbase th
   - There is an option in the MCP server, `READ_ONLY_QUERY_MODE` that is set to true by default to disable running SQL++ queries that change the data or the underlying collection structure. Note that the documents can still be updated by ID.
 - Retreive Index Advisor advice for a query on a specified bucket and scope.
 
+
 ## Prerequisites
 
 - Python 3.10 or higher.
@@ -31,7 +32,7 @@ git clone https://github.com/Couchbase-Ecosystem/mcp-server-couchbase.git
 ### Server Configuration for MCP Clients
 
 This is the common configuration for the MCP clients such as Claude Desktop, Cursor, Windsurf Editor.
-
+Using Basic Auth:
 ```json
 {
   "mcpServers": {
@@ -47,6 +48,30 @@ This is the common configuration for the MCP clients such as Claude Desktop, Cur
         "CB_CONNECTION_STRING": "couchbases://connection-string",
         "CB_USERNAME": "username",
         "CB_PASSWORD": "password",
+        "CA_CERT_PATH" : "path/to/ca.crt"
+      }
+    }
+  }
+}
+```
+
+Using mTLS:
+
+```json
+{
+  "mcpServers": {
+    "couchbase": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "path/to/cloned/repo/mcp-server-couchbase/",
+        "run",
+        "src/mcp_server.py"
+      ],
+      "env": {
+        "CB_CONNECTION_STRING": "couchbases://connection-string",
+        "CLIENT_CERT_PATH": "path/to/client/cert_and_key/",
+        "CA_CERT_PATH" : "path/to/ca.crt"
       }
     }
   }
@@ -56,8 +81,10 @@ This is the common configuration for the MCP clients such as Claude Desktop, Cur
 The server can be configured using environment variables. The following variables are supported:
 
 - `CB_CONNECTION_STRING`: The connection string to the Couchbase cluster
-- `CB_USERNAME`: The username with access to the bucket to use to connect
-- `CB_PASSWORD`: The password for the username to connect
+- `CB_USERNAME`: The username with access to the bucket to use to connect. Must be set if using Baisc Auth and unset if using mTLS.
+- `CB_PASSWORD`: The password for the username to connect. Must be set if using Baisc Auth and unset if using mTLS with client certificate.
+- `CLIENT_CERT_PATH`: The path to client certificate (named client.pem) and key (named client.key) for mTLS authentication. Must be set if using mTLS and unset if using Basic Auth with username and password. 
+- `CA_CERT_PATH`: The path to the CA certificate for trusted TLS connection to the server. If not provided, locally trusted certificate store will be used.
 - `READ_ONLY_QUERY_MODE`: Setting to configure whether SQL++ queries that allow data to be modified are allowed. It is set to True by default.
 - `path/to/cloned/repo/mcp-server-couchbase/` should be the path to the cloned repository on your local machine. Don't forget the trailing slash at the end!
 
