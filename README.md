@@ -81,8 +81,8 @@ Using mTLS:
 The server can be configured using environment variables. The following variables are supported:
 
 - `CB_CONNECTION_STRING`: The connection string to the Couchbase cluster
-- `CB_USERNAME`: The username with access to the bucket to use to connect. Must be set if using Baisc Auth and unset if using mTLS.
-- `CB_PASSWORD`: The password for the username to connect. Must be set if using Baisc Auth and unset if using mTLS with client certificate.
+- `CB_USERNAME`: The username with access to the bucket to use to connect. Must be set if using Basic Auth and unset if using mTLS.
+- `CB_PASSWORD`: The password for the username to connect. Must be set if using Basic Auth and unset if using mTLS with client certificate.
 - `CLIENT_CERT_PATH`: The path to client certificate (named client.pem) and key (named client.key) for mTLS authentication. Must be set if using mTLS and unset if using Basic Auth with username and password. 
 - `CA_CERT_PATH`: The path to the CA certificate for trusted TLS connection to the server. If not provided, locally trusted certificate store will be used.
 - `READ_ONLY_QUERY_MODE`: Setting to configure whether SQL++ queries that allow data to be modified are allowed. It is set to True by default.

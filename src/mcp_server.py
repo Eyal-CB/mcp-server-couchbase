@@ -387,7 +387,7 @@ def advise_index_for_sql_plus_plus_query(
         return response
     except Exception as e:
         logger.error(f"Error running Advise on query: {e}")
-        raise ValueError(f"Unable to run ADVISE on: {query} for keyspace {bucket_name}.{scope_name}")
+        raise ValueError(f"Unable to run ADVISE on: {query} for keyspace {bucket_name}.{scope_name}") from e
 
 @mcp.tool()
 def run_sql_plus_plus_query(
