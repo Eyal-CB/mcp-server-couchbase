@@ -66,7 +66,7 @@ def validate_authentication_method(params : dict ) -> bool:
                 f"Client certificate files not found in {client_cert_path}. Required: client.pem and client.key."
             )
 
-        if username or password:
+        if username or password or username == "" or password =="":
             raise click.BadParameter(
                 "You must use either a client certificate or username/password, not both."
             )
@@ -165,7 +165,7 @@ def main(
         validate_authentication_method(ctx.obj)
     except Exception as e:
         logger.error(f"Failed to validate auth method params: {e}")
-        raise e
+        raise 
     mcp.run(transport=transport)
 
 
@@ -191,10 +191,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         logger.info("Creating Couchbase cluster connection...")
         #use client cert if provided, else user/password
         if client_cert_path:
-            client_cert_path = client_cert_path[:-1] if client_cert_path.endswith('/') else client_cert_path
+                    
             tls_conf = {
-                "cert_path" : f'{client_cert_path}/client.pem',
-                "key_path" : f'{client_cert_path}/client.key',
+                "cert_path" :  os.path.join(client_cert_path, "client.pem"),
+                "key_path" :  os.path.join(client_cert_path, "client.key"),
             }
             #set ca cert as trust store if provided
             if ca_cert_path:
@@ -250,7 +250,7 @@ def get_list_of_buckets_with_settings(
         return result
     except Exception as e:
         logger.error(f"Error getting bucket names: {e}")
-        raise e
+        raise 
 
 
 @mcp.tool()
