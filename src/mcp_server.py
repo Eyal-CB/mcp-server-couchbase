@@ -177,8 +177,6 @@ def load_tool_modules(tools):
             logger.error(f"Error importing tool module '{mod_name}': {e}")
 
 
-
-
 if __name__ == "__main__":
     importlib.import_module("tools") #load default tools
     config = load_config()
