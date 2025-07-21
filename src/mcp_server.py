@@ -295,8 +295,8 @@ def advise_index_for_sql_plus_plus_query(
     response = {}
 
     try:
-        query = f"ADVISE {query}"
-        result = run_sql_plus_plus_query(ctx, bucket_name, scope_name, query)
+        advise_query = f"ADVISE {query}"
+        result = run_sql_plus_plus_query(ctx, bucket_name, scope_name, advise_query)
 
         if result and (advice := result[0].get("advice")):
             if (advice is not None):
@@ -308,7 +308,7 @@ def advise_index_for_sql_plus_plus_query(
         return response
     except Exception as e:
         logger.error(f"Error running Advise on query: {e}")
-        raise ValueError(f"Unable to run ADVISE on: {query} for keyspace {bucket_name}.{scope_name}")
+        raise ValueError(f"Unable to run ADVISE on: {query} for keyspace {bucket_name}.{scope_name}") from e
 
 @mcp.tool()
 def run_sql_plus_plus_query(
