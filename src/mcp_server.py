@@ -374,8 +374,8 @@ def advise_index_for_sql_plus_plus_query(
     response = {}
 
     try:
-        query = f"ADVISE {query}"
-        result = run_sql_plus_plus_query(ctx, bucket_name, scope_name, query)
+        advise_query = f"ADVISE {query}"
+        result = run_sql_plus_plus_query(ctx, bucket_name, scope_name, advise_query)
 
         if result and (advice := result[0].get("advice")):
             if (advice is not None):
