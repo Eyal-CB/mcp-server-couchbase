@@ -312,10 +312,10 @@ def call_api(ctx: Context, url: str ) -> requests.Response:
             logger.error(f"unable to create client certificate object - {e}")
             raise
 
-        else:
-            if not username or not password:
-                raise ValueError("Username and password must be provided for basic authentication.")
-            auth = HTTPBasicAuth(username, password)
+    else:
+        if not username or not password:
+            raise ValueError("Username and password must be provided for basic authentication.")
+        auth = HTTPBasicAuth(username, password)
     try:
         response = requests.get(
             url,
