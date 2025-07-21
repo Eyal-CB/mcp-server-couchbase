@@ -136,7 +136,7 @@ def get_settings() -> dict:
     envvar="CA_CERT_PATH",
     type=click.Path(exists=True),
     default=None,
-    help='Path to Server TLS certificate, required for API calls.')
+    help='Path to Server TLS certificate, uses local trust store if missing')
 
 @click.option(
     "--client-cert-path",
@@ -290,16 +290,37 @@ def get_cluster_health_check(
     return services
 
 def call_api(ctx: Context, url: str ) -> requests.Response:
-    """Call Couchbase API for given URL. Returns raw Response object."""
+    """Call Couchbase API for given URL. Returns raw Response object. Retrieve auth values from App Context.
+    - If `client_cert_path` is not None, it uses 'client.pem' and 'client.key' in that directory.
+    - If `client_cert_path` is None, it uses basic auth with `username` and `password`.
+    """
 
     username = ctx.request_context.lifespan_context.username
     password = ctx.request_context.lifespan_context.password
     ca_cert_path = ctx.request_context.lifespan_context.ca_cert_path or True
+    client_cert_path = ctx.request_context.lifespan_context.client_cert_path
+    auth=None
+    cert=None
 
+    if client_cert_path:
+        # mTLS mode
+        try:
+            client_cert = os.path.join(client_cert_path, "client.pem")
+            client_key = os.path.join(client_cert_path, "client.key")
+            cert = (client_cert, client_key)
+        except Exception as e:
+            logger.error(f"unable to create client certificate object - {e}")
+            raise
+
+        else:
+            if not username or not password:
+                raise ValueError("Username and password must be provided for basic authentication.")
+            auth = HTTPBasicAuth(username, password)
     try:
         response = requests.get(
             url,
-            auth=HTTPBasicAuth(username, password),
+            auth=auth,
+            cert=cert,
             verify=ca_cert_path,  
             timeout=10
         )
