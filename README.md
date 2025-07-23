@@ -43,8 +43,6 @@ This is the common configuration for the MCP clients such as Claude Desktop, Cur
         "--directory",
         "path/to/cloned/repo/mcp-server-couchbase/",
         "run",
-        "--with",
-        "requests",
         "src/mcp_server.py"
       ],
       "env": {
