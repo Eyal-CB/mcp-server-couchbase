@@ -45,8 +45,6 @@ Using Basic Auth:
         "--directory",
         "path/to/cloned/repo/mcp-server-couchbase/",
         "run",
-        "--with",
-        "requests",
         "src/mcp_server.py"
       ],
       "env": {

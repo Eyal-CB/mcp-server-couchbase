@@ -215,6 +215,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
     try:
         logger.info("Creating Couchbase cluster connection...")
+<<<<<<< HEAD
         #use client cert if provided, else user/password
         if client_cert_path:
                     
@@ -228,6 +229,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             auth = CertificateAuthenticator(**tls_conf)
         else:
             auth = PasswordAuthenticator(username, password, cert_path = ca_cert_path)
+=======
+        auth = PasswordAuthenticator(username, password, cert_path = ca_cert_path)
+>>>>>>> cluster_health
 
         options = ClusterOptions(auth)
         options.apply_profile("wan_development")
