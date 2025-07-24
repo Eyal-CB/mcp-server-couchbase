@@ -60,7 +60,7 @@ def get_schema_for_collection(
     try:
         query = f"INFER {collection_name}"
         result = run_sql_plus_plus_query(ctx, bucket_name, scope_name, query)
-        return result
+        return result[0]
     except Exception as e:
         logger.error(f"Error getting schema: {e}")
         raise
